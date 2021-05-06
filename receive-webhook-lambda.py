@@ -51,7 +51,6 @@ def lambda_handler(event, context):
 
 
 def get_file_name(alertId, subaccountId):
-    randomNumber = random.randint(1, 100)
     fileName = "HS-{}-{}-{}".format(alertId, subaccountId, str(time.time())).split(".")[0]  # chosen file name convension is HS-subaccount_id-timestamp
     return fileName
 
