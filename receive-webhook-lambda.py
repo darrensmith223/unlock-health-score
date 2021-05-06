@@ -22,6 +22,7 @@ def lambda_handler(event, context):
             alertObj = Dict2Class(alert)
             alertId = alertObj.alert_id
             filterObj = Dict2Class(alertObj.filters)
+
             if hasattr(filterObj, "subaccount_id"):
                 subaccountId = filterObj.subaccount_id
             else:
@@ -59,8 +60,9 @@ def write_to_dynamodb(alertObj, dynamodb=None):
     if not dynamodb:
         dynamodb = boto3.resource('dynamodb', endpoint_url="http://localhost:8000")
     
-    if hasattr(alertObj.filters, "subaccount_id"):
-        subaccountId = alertObj.filters.subaccount_id
+    filterObj = Dict2Class(alertObj.filters)
+    if hasattr(filterObj, "subaccount_id"):
+        subaccountId = filterObj.subaccount_id
     else:
         subaccountId = -1  # set "overall" Health Scores to be -1 for easy identification
     
