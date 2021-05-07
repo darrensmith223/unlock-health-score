@@ -13,3 +13,4 @@ The complete workflow can be described as:
 * The ALB will trigger a Lambda function that validates the data and writes it to an S3 bucket for storage
 * The data is loaded into a database and/or data lake for analysis and access to downstream applications
 
+![Flowchart](/img/hs_alert_flowchart.png)
