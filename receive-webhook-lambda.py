@@ -7,10 +7,41 @@ import botocore
 from decimal import Decimal
 
 
-class Dict2Class(object):
+class dict_to_class(object):
     def __init__(self, my_dict):
         for key in my_dict:
             setattr(self, key, my_dict[key])
+
+class evaluator:
+    pass
+
+
+class filters:
+    pass
+
+
+class alertpayload(object):
+    def __init__(self, alert):
+        alertObj = dict_to_class(alert)
+        filterObj = dict_to_class(alertObj.filters)
+        evaluatorObj = dict_to_class(alertObj.evaluator)
+        
+        self.alert_id = alertObj.alert_id
+        self.name = alertObj.name
+        self.metric = alertObj.metric
+        self.evaluator = evaluator()
+        self.evaluator.operator = evaluatorObj.operator
+        self.evaluator.source = evaluatorObj.source
+        self.evaluator.value = evaluatorObj.value
+        self.filters = filters()
+        
+        if hasattr(filterObj, "subaccount_id"):
+            self.filters.subaccount_id = filterObj.subaccount_id
+        else:
+            self.filters.subaccount_id = -1  # set "overall" Health Scores to be -1 for easy identification
+        
+        self.triggered_value = alertObj.triggered_value
+        self.triggered_at = alertObj.triggered_at
 
 
 def lambda_handler(event, context):
@@ -19,23 +50,17 @@ def lambda_handler(event, context):
         alertsList = json.loads(event['body'])
 
         for alert in alertsList:
-            alertObj = Dict2Class(alert)
-            alertId = alertObj.alert_id
-            filterObj = Dict2Class(alertObj.filters)
-
-            if hasattr(filterObj, "subaccount_id"):
-                subaccountId = filterObj.subaccount_id
-            else:
-                subaccountId = "overall"
+            
+            alertObj = alertpayload(alert)
+            
+            # store file in S3
+            fileName = get_file_name(alertObj)
+            s3_client = boto3.client('s3')
+            store_batch(s3_client, json.dumps(alert), fileName)
                 
             # write values to database
             dynamodb = boto3.client('dynamodb')
             write_to_dynamodb(alertObj, dynamodb)
-            
-            # store file in S3
-            fileName = get_file_name(alertId, subaccountId)
-            s3_client = boto3.client('s3')
-            store_batch(s3_client, json.dumps(alert), fileName)
 
         return {
             'statusCode': 200,
@@ -50,20 +75,17 @@ def lambda_handler(event, context):
         }
 
 
-def get_file_name(alertId, subaccountId):
+def get_file_name(alertObj):
+    alertId = alertObj.alert_id
+    subaccountId = alertObj.filters.subaccount_id
     fileName = "HS-{}-{}-{}".format(alertId, subaccountId, str(time.time())).split(".")[0]  # chosen file name convension is HS-subaccount_id-timestamp
+    
     return fileName
 
 
 def write_to_dynamodb(alertObj, dynamodb=None):
     if not dynamodb:
         dynamodb = boto3.resource('dynamodb', endpoint_url="http://localhost:8000")
-    
-    filterObj = Dict2Class(alertObj.filters)
-    if hasattr(filterObj, "subaccount_id"):
-        subaccountId = filterObj.subaccount_id
-    else:
-        subaccountId = -1  # set "overall" Health Scores to be -1 for easy identification
     
     health_score = Decimal(str(alertObj.triggered_value))  # convert to string then decimal to avoid potential rounding issue
 
@@ -74,11 +96,12 @@ def write_to_dynamodb(alertObj, dynamodb=None):
             'alert_id': {'N': str(alertObj.alert_id)},
             'name': {'S': alertObj.name},
             'metric': {'S': alertObj.metric},
-            'subaccount_id': {'N': str(subaccountId)},
+            'subaccount_id': {'N': str(alertObj.filters.subaccount_id)},
             'triggered_value': {'N': str(health_score)},  
             'triggered_at': {'S': alertObj.triggered_at}
         }
     )
+    
     return response
     
 
