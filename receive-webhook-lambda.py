@@ -4,7 +4,6 @@ import time
 import uuid
 import boto3
 import botocore
-from decimal import Decimal
 
 
 class dict_to_class(object):
@@ -86,8 +85,8 @@ def get_file_name(alertObj):
 def write_to_dynamodb(alertObj, dynamodb=None):
     if not dynamodb:
         dynamodb = boto3.resource('dynamodb', endpoint_url="http://localhost:8000")
-    
-    health_score = Decimal(str(alertObj.triggered_value))  # convert to string then decimal to avoid potential rounding issue
+
+    health_score = format(alertObj.triggered_value, ".3f")
 
     response = dynamodb.put_item(
         TableName='hs_alerts',
